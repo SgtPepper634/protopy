@@ -1,11 +1,9 @@
 import inspect
-from collections.abc import Callable
-from typing import TypeAlias
-
-MethodList: TypeAlias = list[tuple[str, Callable]]
+from shared_types import MethodList
+from protocols import write_protocols
 
 def is_user_defined_method(method) -> bool:
-  return inspect.isroutine(method) and not inspect.isbuiltin(method)
+  return inspect.isroutine(method) and not inspect.isbuiltin(method) # TODO: handle decorator functions
 
 def print_custom_methods(methods: MethodList, parent) -> None:
   if len(methods) > 0:
@@ -36,6 +34,8 @@ def callable_tracer(frame, event, arg = None):
   arg_count = code.co_argcount
   # extracts argument and local variable names
   arg_names = code.co_varnames
+  
+  custom_methods = None
 
   if event == 'call':
     # arg parameter is always None here 
@@ -58,8 +58,6 @@ def callable_tracer(frame, event, arg = None):
     
       custom_methods = get_arguments_user_defined_methods(arg_value)
 
-      # TODO: Build Protocol for each method from custom_methods 
-
   elif event == 'return':
     print(f"Function RETURN: line number {line_no}:") 
     print(f"\tfunction name = {func_name}")
@@ -68,9 +66,9 @@ def callable_tracer(frame, event, arg = None):
 
     custom_methods = get_arguments_user_defined_methods(arg)
 
-    # TODO: Build Protocol for each method from custom_methods
-
   elif event == 'line':
     return
   
+  write_protocols(custom_methods)
+
   return callable_tracer
