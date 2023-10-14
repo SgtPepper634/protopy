@@ -14,9 +14,9 @@ def test_generate_protocol_1() -> None:
     expected = textwrap.dedent("""\
         class Arg(Protocol):
             ...
-    """)
+    """).strip()
 
-    result = protopy.generate_protocol(func, "arg")
+    result = protopy.generate_protocols(func)[0]
 
     assert result == expected
 
@@ -32,9 +32,9 @@ def test_generate_protocol_2() -> None:
         class Arg(Protocol):
             def foo(self):
                 ...
-    """)
+    """).strip()
 
-    result = protopy.generate_protocol(func, "arg")
+    result = protopy.generate_protocols(func)[0]
 
     assert result == expected
 

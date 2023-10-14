@@ -61,22 +61,28 @@ def _get_source(obj: object, /) -> str:
     return textwrap.dedent(source).strip()
 
 
-def _analyze_argument_callables(func: Callable[..., object], /) -> list[_MethodCall]:
+def _analyze_callables(func: Callable[..., object], /) -> list[_MethodCall]:
     source = _get_source(func)
     tree = ast.parse(source)
     callvisitor = _MethodCallVisitor()
     callvisitor.visit(tree)
-
-    def remove_non_argument_callables(argument_callables: dict) -> None:
-        function_signature = inspect.signature(func)
-        params_to_delete = []
-        for param_name in argument_callables:
-            if param_name not in function_signature.parameters:
-                params_to_delete.append(param_name)
-
-        for param_name in params_to_delete:
-            del argument_callables[param_name]
-
-    remove_non_argument_callables(callvisitor.method_calls)
-
     return callvisitor.method_calls
+
+
+def generate_protocols(func: Callable[..., object], /) -> list[str]:
+    argument_callables = _analyze_callables(func)
+    params = inspect.signature(func).parameters
+    protocols = []
+    for param_name in params:
+        protocol = "class "
+        for name_component in param_name.split("_"):
+            protocol += name_component[0].upper() + name_component[1:]
+        protocol += "(Protocol):"
+        try:
+            for method_name in argument_callables[param_name]:
+                protocol += f"\n\tdef {method_name}(self):\n\t\t..."  # TODO: add arguments for method
+        except KeyError:
+            protocol += "\n\t..."
+        protocols.append(protocol.expandtabs(4))
+
+    return protocols
