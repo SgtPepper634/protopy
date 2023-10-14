@@ -16,7 +16,7 @@ class _MethodCall:
 class _MethodCallVisitor(ast.NodeVisitor):
     def __init__(self):
         self._method_calls = {}
-        '''
+        """
         dictionary structure
         {
             param_name: {
@@ -27,7 +27,7 @@ class _MethodCallVisitor(ast.NodeVisitor):
             }
 
         }
-        '''
+        """
 
     @property
     def method_calls(self):
@@ -66,4 +66,17 @@ def _analyze_argument_callables(func: Callable[..., object], /) -> list[_MethodC
     tree = ast.parse(source)
     callvisitor = _MethodCallVisitor()
     callvisitor.visit(tree)
+
+    def remove_non_argument_callables(argument_callables: dict) -> None:
+        function_signature = inspect.signature(func)
+        params_to_delete = []
+        for param_name in argument_callables:
+            if param_name not in function_signature.parameters:
+                params_to_delete.append(param_name)
+
+        for param_name in params_to_delete:
+            del argument_callables[param_name]
+
+    remove_non_argument_callables(callvisitor.method_calls)
+
     return callvisitor.method_calls
