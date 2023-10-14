@@ -28,7 +28,7 @@ class _MethodCallVisitor(ast.NodeVisitor):
                     param_name=node.func.value.id,
                     method_name=node.func.attr,
                     args=tuple((arg.value for arg in node.args)),
-                    kwargs=((kwarg.arg, kwarg.value.value) for kwarg in node.keywords),
+                    kwargs=tuple((kwarg.arg, kwarg.value.value) for kwarg in node.keywords),
                 )
 
                 self.method_calls.append(method_call)
