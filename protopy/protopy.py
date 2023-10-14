@@ -15,26 +15,45 @@ class _MethodCall:
 
 class _MethodCallVisitor(ast.NodeVisitor):
     def __init__(self):
-        self._method_calls = []
+        self._method_calls = {}
+        '''
+        dictionary structure
+        {
+            param_name: {
+                    method_name: {
+                            args: list[tuple[object]]
+                            kwargs: list[tuple(tuple(str, object))]
+                    }
+            }
+
+        }
+        '''
 
     @property
     def method_calls(self):
         return self._method_calls
 
     def visit_Call(self, node):
-        if isinstance(node, ast.Call):
-            try:
-                method_call = _MethodCall(
-                    param_name=node.func.value.id,
-                    method_name=node.func.attr,
-                    args=tuple((arg.value for arg in node.args)),
-                    kwargs=tuple((kwarg.arg, kwarg.value.value) for kwarg in node.keywords),
-                )
+        if not isinstance(node, ast.Call):
+            return
 
-                self.method_calls.append(method_call)
+        try:
+            param_name = node.func.value.id
+            method_name = node.func.attr
+            args = tuple(arg.value for arg in node.args)
+            kwargs = tuple((kwarg.arg, kwarg.value.value) for kwarg in node.keywords)
 
-            except AttributeError:
-                self.generic_visit(node)
+            if param_name not in self.method_calls:
+                self.method_calls[param_name] = {}
+
+            if method_name not in self.method_calls[param_name]:
+                self.method_calls[param_name][method_name] = {"args": [], "kwargs": []}
+
+            self.method_calls[param_name][method_name]["args"].append(args)
+            self.method_calls[param_name][method_name]["kwargs"].append(kwargs)
+
+        except AttributeError:
+            self.generic_visit(node)
 
 
 def _get_source(obj: object, /) -> str:
@@ -42,7 +61,7 @@ def _get_source(obj: object, /) -> str:
     return textwrap.dedent(source).strip()
 
 
-def _analyze_callable(func: Callable[..., object], /) -> list[_MethodCall]:
+def _analyze_argument_callables(func: Callable[..., object], /) -> list[_MethodCall]:
     source = _get_source(func)
     tree = ast.parse(source)
     callvisitor = _MethodCallVisitor()
