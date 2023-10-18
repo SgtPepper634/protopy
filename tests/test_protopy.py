@@ -4,17 +4,17 @@ import pytest
 
 import protopy
 
-from sys import settrace
-
 
 def test_generate_protocol_1() -> None:
     def func(arg):
         return arg
 
-    expected = textwrap.dedent("""\
+    expected = textwrap.dedent(
+        """\
         class Arg(Protocol):
             ...
-    """).strip()
+    """
+    ).strip()
 
     result = protopy.generate_protocols(func)[0]
 
@@ -28,17 +28,19 @@ def test_generate_protocol_2() -> None:
     # NOTE(Will): We might be able to also deduce what the return type
     # of `foo` is and add it to the protocol. But let's not do that for
     # now.
-    expected = textwrap.dedent("""\
+    expected = textwrap.dedent(
+        """\
         class Arg(Protocol):
-            def foo(self):
+            def foo(self, *args, **kwargs):
                 ...
-    """).strip()
+    """
+    ).strip()
 
     result = protopy.generate_protocols(func)[0]
-
     assert result == expected
 
-''' TODO: turn contents of old main.py into test
+
+""" TODO: turn contents of old main.py into test
 
 def test_generate_protocol_3() -> None:
     class David:
@@ -64,4 +66,4 @@ def test_generate_protocol_3() -> None:
 
     who_is_this(david)
 
-'''
+"""

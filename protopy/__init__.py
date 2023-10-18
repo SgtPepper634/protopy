@@ -1,1 +1,5 @@
-from .protopy import *
+__all__ = [
+    "generate_protocols",
+]
+
+from protopy.lib import generate_protocols
