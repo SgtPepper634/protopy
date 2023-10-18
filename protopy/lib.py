@@ -5,30 +5,31 @@ __all__ = [
 import ast
 import inspect
 import textwrap
-from dataclasses import dataclass
+from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import List, Dict, Tuple
 
 
-@dataclass(frozen=True)
-class _MethodCall:
-    param_name: str
-    method_name: str
-    args: tuple[object, ...]
-    kwargs: tuple[tuple[str, object], ...]
+@dataclass
+class _Method:
+    args: List[object]
+    kwargs: Tuple[str, object] = field(default_factory=tuple)
+
+
+@dataclass
+class _Parameter:
+    methods: Dict[str, _Method] = field(default_factory=dict)
+
+
+@dataclass
+class _FunctionData:
+    parameters: Dict[str, _Parameter] = field(default_factory=defaultdict(_Parameter))
 
 
 class _MethodCallVisitor(ast.NodeVisitor):
     def __init__(self):
-        self._method_calls = {}
-        # dictionary structure
-        # {
-        #    param_name: {
-        #        method_name: {
-        #                args: list[tuple[object]]
-        #                kwargs: list[tuple(tuple(str, object))]
-        #        }
-        #    }
-        # }
+        self._method_calls = defaultdict(_Parameter)
 
     @property
     def method_calls(self):
@@ -44,13 +45,11 @@ class _MethodCallVisitor(ast.NodeVisitor):
         except AttributeError:
             self.generic_visit(node)
 
-        self.method_calls.setdefault(param_name, {})
-        self.method_calls[param_name].setdefault(
-            method_name, {"args": [], "kwargs": []}
-        )
+        method_data = _Method(args=args, kwargs=kwargs)
+        self.method_calls[param_name].methods[method_name] = method_data
 
-        self.method_calls[param_name][method_name]["args"].append(args)
-        self.method_calls[param_name][method_name]["kwargs"].append(kwargs)
+    def get_function_data(self) -> _FunctionData:
+        return _FunctionData(parameters=dict(self.method_calls))
 
 
 def _get_source(obj: object, /) -> str:
@@ -58,12 +57,28 @@ def _get_source(obj: object, /) -> str:
     return textwrap.dedent(source).strip()
 
 
-def _analyze_callables(func: Callable[..., object], /) -> list[_MethodCall]:
+def _analyze_callables(func: Callable[..., object], /) -> _FunctionData:
     source = _get_source(func)
     tree = ast.parse(source)
     callvisitor = _MethodCallVisitor()
     callvisitor.visit(tree)
-    return callvisitor.method_calls
+    return callvisitor.get_function_data()
+
+
+def generate_argument_protocol_def(param_name: str) -> str:
+    protocol = "class "
+    for name_component in param_name.split("_"):
+        protocol += name_component[0].upper() + name_component[1:]
+    return f"{protocol}(Protocol):"
+
+
+def generate_argument_protocol_methods(methods: _Parameter) -> str:
+    return "\n".join(
+        [
+            f"\n\tdef {method_name}(self, *args, **kwargs):\n\t\t..."
+            for method_name in methods
+        ]
+    )
 
 
 def generate_protocols(func: Callable[..., object], /) -> list[str]:
@@ -71,16 +86,14 @@ def generate_protocols(func: Callable[..., object], /) -> list[str]:
     params = inspect.signature(func).parameters
     protocols = []
     for param_name in params:
-        protocol = "class "
-        for name_component in param_name.split("_"):
-            protocol += name_component[0].upper() + name_component[1:]
-        protocol += "(Protocol):"
-        try:
-            print(argument_callables[param_name])
-            for method_name in argument_callables[param_name]:
-                protocol += f"\n\tdef {method_name}(self, *args, **kwargs):\n\t\t..."
-        except KeyError:
+        protocol = generate_argument_protocol_def(param_name)
+        if param_name in argument_callables.parameters:
+            protocol += generate_argument_protocol_methods(
+                argument_callables.parameters[param_name].methods
+            )
+        else:
             protocol += "\n\t..."
+
         protocols.append(protocol.expandtabs(4))
 
     return protocols
