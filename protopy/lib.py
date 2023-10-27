@@ -1,13 +1,12 @@
 __all__ = [
     "generate_protocol",
 ]
-
 import ast
 import inspect
 import textwrap
-from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from collections import defaultdict, OrderedDict
 
 
 @dataclass
@@ -52,8 +51,8 @@ def _get_source(obj: object, /) -> str:
     return textwrap.dedent(source).strip()
 
 
-def _analyze_callables(func: Callable[..., object], /) -> _FunctionData:
-    source = _get_source(func)
+def _analyze_callables(func: Callable[..., object] | str, /) -> _FunctionData:
+    source = _get_source(func) if isinstance(func, Callable) else func
     tree = ast.parse(source)
     callvisitor = _MethodCallVisitor()
     callvisitor.visit(tree)
@@ -80,7 +79,7 @@ def _generate_argument_protocol_methods(methods: dict[str, _Method]) -> str:
 
 
 def _generate_protocol_string_list(
-    argument_callables: _FunctionData, params: str
+    argument_callables: _FunctionData, params: OrderedDict[str, inspect.Parameter]
 ) -> tuple[str]:
     protocols = []
     for param_name in params:
@@ -92,11 +91,23 @@ def _generate_protocol_string_list(
             protocol += "\n\t..."
 
         protocols.append(protocol.expandtabs(4))
-
     return protocols
 
 
-def generate_protocols(func: Callable[..., object], /) -> list[str]:
+def generate_protocols(
+    # func comes in as str if called from cli otherwise the function was called with a Callable
+    func: Callable[..., object] | str,
+    # params is None if:
+    #   1. called from cli and func simply has no params
+    #   2. func not called from cli
+    #    - Example: generate_protocols(some_func)
+    params: OrderedDict[str, inspect.Parameter] | None = None,
+    /,
+) -> list[str]:
     argument_callables = _analyze_callables(func)
-    params = inspect.signature(func).parameters
+
+    # if function not called from cli
+    if params is None and not isinstance(func, str):
+        params = inspect.signature(func).parameters
+
     return _generate_protocol_string_list(argument_callables, params)
